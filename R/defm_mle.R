@@ -9,7 +9,6 @@
 #' @param ... Further arguments passed to [stats4::mle].
 #' @export
 #' @import stats4
-#' @importFrom stats pnorm
 #' @details 
 #' The likelihood function of the DEFM is closely-related to the 
 #' Exponential-Family Random Graph Model \[ERGM\]. Furthermore, the DEFM can 
@@ -110,9 +109,11 @@ defm_mle <- function(
 
 }
 
+#' @importFrom stats pnorm
 pval_calc <- function(obj) {
-  pvals <- -abs(coef(obj)/sqrt(diag(vcov(obj)))) |> pnorm()
-  pvals * 2
+  stats::pnorm(
+    -abs(stats4::coef(obj)/sqrt(diag(stats4::vcov(obj))))
+    ) * 2
 }
 
 #' @export
@@ -125,12 +126,12 @@ summary_table <- function(object, as_texreg = FALSE, ...) {
 
   # Generating the output table
   tab <- list(
-    coef.names  = names(coef(object)),
-    coef        = coef(object),
-    se          = sqrt(diag(vcov(object))),
+    coef.names  = names(stats4::coef(object)),
+    coef        = stats4::coef(object),
+    se          = sqrt(diag(stats4::vcov(object))),
     gof.names   = c("AIC", "BIC", "N"),
-    gof         = c(AIC(object), BIC(object), nobs(object)),
-    gof.decimal = c(T,T,F),
+    gof         = c(stats4::AIC(object), stats4::BIC(object), stats4::nobs(object)),
+    gof.decimal = c(T, T, F),
     pvalues     = pval_calc(object)
   )
 

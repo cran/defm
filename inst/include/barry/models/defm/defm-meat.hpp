@@ -1,137 +1,9 @@
-
-#ifndef DEFM_HPP
-#define DEFM_HPP 1
-
-// #include "../barry.hpp"
-
-#include <iterator>
-#include <regex>
-
-/*//////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-
- Start of -include/barry/models/defm/defm-bones.hpp-
-
-////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////*/
-
-
-#ifndef DEFM_BONES_HPP
-#define DEFM_BONES_HPP 1
-
-class DEFM : public defmcounters::DEFMModel {
-private:
-
-    // std::shared_ptr< std::mt19937 > rengine = nullptr;
-    // std::shared_ptr< defmcounters::DEFMModel > model = nullptr;
-
-    /**
-     * @brief Model data
-     */
-    ///@{
-    const int * Y = nullptr;    ///< Outcome variable
-    const int * ID = nullptr;   ///< Individual ids
-    const double * X = nullptr; ///< Covariates
-    
-    size_t N;             ///< Number of agents/individuals
-    size_t ID_length;     ///< Length of the vector IDs
-    size_t Y_ncol;        ///< Number of columns in the response
-    size_t Y_length;      ///< Length of the vector Y
-    size_t X_ncol;        ///< Number of columns in the features
-    size_t X_length;      ///< Length of the vector X
-    size_t M_order;       ///< Markov order of the model
-
-    std::vector< std::string > Y_names;
-    std::vector< std::string > X_names;
-    std::vector< size_t > start_end;
-    std::vector< size_t > model_ord;
-    ///@}
-
-public:
-
-    DEFM(
-        const int * id,
-        const int * y,
-        const double * x,
-        size_t id_length,
-        size_t y_ncol,
-        size_t x_ncol,
-        size_t m_order
-    );
-
-    // ~DEFM() {
-    //     defmcounters::DEFMModel::~Model();
-    // };
-
-    defmcounters::DEFMModel & get_model() {
-        return *this;
-    };
-
-    void init();
-
-    double likelihood(std::vector< double > & par, bool as_log = false);
-    void simulate(std::vector< double > par, int * y_out);
-
-    size_t get_n_y() const;
-    size_t get_n_obs() const;
-    size_t get_n_covars() const;
-    size_t get_m_order() const;
-    size_t get_n_rows() const;
-
-    const int * get_Y() const;
-    const int * get_ID() const;
-    const double * get_X() const;
-
-    barry::FreqTable<int> motif_census(
-        std::vector< size_t > idx
-    );
-
-    std::vector< double > logodds(
-        const std::vector< double > & par,
-        size_t i,
-        size_t j
-    );
-
-    void set_names(
-        std::vector< std::string > Y_names_,
-        std::vector< std::string > X_names_
-    );
-
-    const std::vector< std::string > & get_Y_names() const;
-    const std::vector< std::string > & get_X_names() const;
-
-    void print() const;
-
-    std::vector< bool > is_motif();
-
-};
-
-#endif
-
-/*//////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-
- End of -include/barry/models/defm/defm-bones.hpp-
-
-////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////*/
-
-
-/*//////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-
- Start of -include/barry/models/defm/defm-meat.hpp-
-
-////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////*/
-
-
 #ifndef DEFM_MEAT_HPP
 #define DEFM_MEAT_HPP 1
 
 inline std::vector< double > keygen_defm(
-    const defmcounters::DEFMArray & Array_,
-    defmcounters::DEFMCounterData * data
+    const DEFMArray & Array_,
+    DEFMCounterData * data
     ) {
     
     size_t nrow = Array_.nrow();
@@ -171,7 +43,7 @@ inline void DEFM::simulate(
     size_t model_num = 0u; 
     size_t n_entry = M_order * Y_ncol;
     auto idx = this->get_arrays2support();
-    defmcounters::DEFMArray last_array;
+    DEFMArray last_array;
     for (size_t i = 0u; i < N; ++i)
     {
 
@@ -195,14 +67,14 @@ inline void DEFM::simulate(
             // Otherwise, we need to continue using the previous data!
             {
                 // Removing the previous row
-                defmcounters::DEFMArray tmp_array(M_order + 1u, Y_ncol);
+                DEFMArray tmp_array(M_order + 1u, Y_ncol);
                 for (size_t t_i = 1u; t_i < (M_order + 1u); ++t_i)
                     for (size_t t_j = 0u; t_j < Y_ncol; ++t_j)
                         tmp_array(t_i - 1u, t_j) = last_array(t_i, t_j);
 
                 // Setting the data
                 tmp_array.set_data(
-                    new defmcounters::DEFMData(&tmp_array, X, (start_i + proc_n), X_ncol, ID_length),
+                    new DEFMData(&tmp_array, X, (start_i + proc_n), X_ncol, ID_length),
                     true // Delete the data
                 );
 
@@ -230,19 +102,44 @@ inline void DEFM::simulate(
 }
 
 inline DEFM::DEFM(
-    const int * id,
-    const int * y,
-    const double * x,
+    int * id,
+    int * y,
+    double * x,
     size_t id_length,
     size_t y_ncol,
     size_t x_ncol,
-    size_t m_order
+    size_t m_order,
+    bool copy_data
 ) {
 
     // Pointers
-    ID = id;
-    Y  = y;
-    X  = x;
+    if (copy_data)
+    {
+
+        ID_shared = std::make_shared< std::vector<int> >(id_length);
+        Y_shared  = std::make_shared< std::vector<int> >(id_length * y_ncol);
+        X_shared  = std::make_shared< std::vector<double> >(id_length * x_ncol);
+
+        for (size_t i = 0u; i < id_length; ++i)
+            ID_shared->at(i) = *(id + i);
+
+        for (size_t i = 0u; i < (id_length * y_ncol); ++i)
+            Y_shared->at(i) = *(y + i);
+
+        for (size_t i = 0u; i < (id_length * x_ncol); ++i)
+            X_shared->at(i) = *(x + i);
+
+        ID = &ID_shared->at(0u);
+        Y  = &Y_shared->at(0u);
+        X  = &X_shared->at(0u);
+
+    } else {
+
+        ID = id;
+        Y  = y;
+        X  = x;
+
+    }
 
     // Overall dimmensions
     ID_length = id_length;
@@ -317,7 +214,7 @@ inline void DEFM::init()
 {
 
     // Adding the rule
-    defmcounters::rules_markov_fixed(this->get_rules(), M_order);
+    rules_markov_fixed(this->get_rules(), M_order);
 
     // Creating the arrays
     for (size_t i = 0u; i < N; ++i)
@@ -334,9 +231,9 @@ inline void DEFM::init()
         {
 
             // Creating the array for process n_proc and setting the data
-            defmcounters::DEFMArray array(M_order + 1u, Y_ncol);
+            DEFMArray array(M_order + 1u, Y_ncol);
             array.set_data(
-                new defmcounters::DEFMData(&array, X, (start_i + n_proc), X_ncol, ID_length),
+                new DEFMData(&array, X, (start_i + n_proc), X_ncol, ID_length),
                 true // Delete the data
             );
 
@@ -452,9 +349,9 @@ inline std::vector< double > DEFM::logodds(
         {
 
             // Creating the array for process n_proc and setting the data
-            defmcounters::DEFMArray array(M_order + 1u, Y_ncol);
+            DEFMArray array(M_order + 1u, Y_ncol);
             array.set_data(
-                new defmcounters::DEFMData(&array, X, (start_i + n_proc), X_ncol, ID_length),
+                new DEFMData(&array, X, (start_i + n_proc), X_ncol, ID_length),
                 true // Delete the data
             );
 
@@ -502,7 +399,7 @@ inline const std::vector<std::string > & DEFM::get_X_names() const {
 
 inline void DEFM::print() const
 {
-    defmcounters::DEFMModel::print();
+    DEFMModel::print();
     printf_barry("Model Y variables (%i):\n", static_cast<int>(get_n_y()));
     int ny = 0;
     for (const auto & y : get_Y_names())
@@ -516,7 +413,7 @@ inline void DEFM::print() const
 inline std::vector< bool > DEFM::is_motif()
 {
     std::vector< bool > res(0u);
-    auto * counterss = defmcounters::DEFMModel::get_counters();
+    auto * counterss = DEFMModel::get_counters();
     for (size_t i = 0u; i < counters->size(); ++i)
         res.push_back(counterss->operator[](i).data.is_motif);
 
@@ -525,17 +422,5 @@ inline std::vector< bool > DEFM::is_motif()
 
 #undef DEFM_RANGES
 #undef DEFM_LOOP_ARRAYS
-
-#endif
-/*//////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-
- End of -include/barry/models/defm/defm-meat.hpp-
-
-////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////*/
-
-
-
 
 #endif

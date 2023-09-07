@@ -82,10 +82,8 @@ new_defm <- function(
 }
 
 #' @export
-#' @rdname DEFM
-#' @param object An object of class [DEFM].
-#' @return - `nobs` is an alias for `nobs_defm()`.
-#' @param ... Not used.
+#' @importFrom stats4 nobs
+#' @method nobs DEFM
 nobs.DEFM <- function(object, ...) {
   nobs_defm(object)
 }
